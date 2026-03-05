@@ -151,7 +151,14 @@ static inline uint8_t applyThrCurve(uint8_t u, uint8_t dz, uint8_t st) {
 // Edit state machine
 // =========================
 enum EditTarget : uint8_t { EDIT_THR=0, EDIT_STR=1 };
-enum EditStep   : uint8_t { EDIT_MENU=0, EDIT_DIR=1, EDIT_MIN=2, EDIT_MAX=3 };
+enum EditStep : uint8_t {
+  EDIT_MENU=0,
+  EDIT_DIR=1,
+  EDIT_MIN=2,
+  EDIT_MAX=3,
+  EDIT_THR_DZ=4,
+  EDIT_THR_ST=5
+};
 
 struct EditCtx {
   EditTarget target;
@@ -182,35 +189,48 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
   lcdPrintFixed(0, 0, String(h));
 
   if (e.step == EDIT_MENU) {
-    // row1/row2: menu items
     lcd.setCursor(0, 1);
-    lcdBox(e.sel == 0); lcd.print(" Setting");
-    lcdPrintFixed(10, 1, ""); // clear rest
+    lcdBox(e.sel == 0); lcd.print((String(label)=="THR") ? " Calibration" : " Setting");
+    lcdPrintFixed(13, 1, "");
 
     lcd.setCursor(0, 2);
-    lcdBox(e.sel == 1); lcd.print(" Back");
-    lcdPrintFixed(10, 2, "");
-
-    // row3 summary
-    char s[21];
-    snprintf(s, sizeof(s), "inv:%c mn:%4u mx:%4u",
+    lcdBox(e.sel == 1); lcd.print((String(label)=="THR") ? " Deadzone" : " Back");
+    lcdPrintFixed(13, 2, "");
+    
+    // THRなら curve値も表示、STRなら従来summary
+    if (String(label)=="THR") {
+      char s[21];
+      snprintf(s, sizeof(s), "dz:%3u st:%3u", (unsigned)thrDeadzoneU8, (unsigned)thrStartU8);
+      lcdPrintFixed(0, 3, String(s));
+    } else {
+      // row3 summary
+      char s[21];
+      snprintf(s, sizeof(s), "inv:%c mn:%4u mx:%4u",
              cfg.inv ? 'Y' : 'N', (unsigned)cfg.minRaw, (unsigned)cfg.maxRaw);
-    lcdPrintFixed(0, 3, String(s));
+      lcdPrintFixed(0, 3, String(s));
+      
+    }
     return;
   }
 
-  if (e.step == EDIT_DIR) {
-    lcd.setCursor(0, 1);
-    lcdBox(e.sel == 0); lcd.print(" Normal");
-    lcdPrintFixed(10, 1, "");
-
-    lcd.setCursor(0, 2);
-    lcdBox(e.sel == 1); lcd.print(" Invert");
-    lcdPrintFixed(10, 2, "");
-
-    lcdPrintFixed(0, 3, "SW:OK  HOLD:MENU   ");
+  if (edit.step == EDIT_MENU) {
+    if (edit.target == EDIT_THR) {
+      if (edit.sel == 0) {
+        // Calibrationへ（従来通り）
+        edit.step = EDIT_DIR;
+        edit.sel = cfg.inv ? 1 : 0;
+        lcd.clear();
+      } else {
+        // Deadzone編集へ
+        edit.step = EDIT_THR_DZ;
+        lcd.clear();
+      }
+    } else {
+      // STRは従来通り Setting/Back
+      if (edit.sel == 0) { ... } else { editExitToScroll(); }
+    }
     return;
-  }
+}
 
   if (e.step == EDIT_MIN) {
     lcdPrintFixed(0, 1, "SET MIN (VR->raw)  ");
