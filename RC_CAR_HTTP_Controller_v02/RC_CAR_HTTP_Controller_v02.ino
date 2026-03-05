@@ -496,8 +496,11 @@ void loop() {
   uint8_t thr_u = mapRawToU8_Calib(thr_raw, cfgThr);
   uint8_t str_u = mapRawToU8_Calib(str_raw, cfgStr);
 
+  // thr: apply curve (deadzone + start offset)
+  uint8_t thr_curved = applyThrCurve(thr_u);
+
   // ★送信値：編集中は thr=0（安全）
-  uint8_t thr_send = (uiMode == UI_EDIT) ? 0 : thr_u;
+  uint8_t thr_send = (uiMode == UI_EDIT) ? 0 : thr_curved;
   uint8_t str_send = str_u;
 
   // --- Send (HTTP) ---
