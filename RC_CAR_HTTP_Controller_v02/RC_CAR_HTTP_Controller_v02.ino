@@ -241,23 +241,36 @@ static inline void editHandleRotate(long encNow) {
   long diff = encNow - uiEncBase;
   if (millis() - uiLastMs < UI_DEBOUNCE_MS) return;
 
-  if (edit.step == EDIT_MENU || edit.step == EDIT_DIR) {
-    if (diff >= PAGE_STEP_COUNTS) {
-      uiEncBase += PAGE_STEP_COUNTS;
-      edit.sel = (edit.sel + 1) % 2;
-      uiLastMs = millis();
+  int stepCounts = PAGE_STEP_COUNTS;
+
+  // DeadZone / StartPoint は回転で調整
+  if (edit.step == EDIT_THR_DZ || edit.step == EDIT_THR_ST) {
+    int delta = 0;
+    if (diff >= PAGE_STEP_COUNTS) { uiEncBase += PAGE_STEP_COUNTS; delta = +1; }
+    else if (diff <= -PAGE_STEP_COUNTS) { uiEncBase -= PAGE_STEP_COUNTS; delta = -1; }
+    else return;
+
+    if (edit.step == EDIT_THR_DZ) {
+      int v = (int)thrDeadzoneU8 + delta;
+      // 実用上0..200くらいが扱いやすい
+      thrDeadzoneU8 = (uint8_t)clampi(v, 0, 200);
+      // deadzone >=255は無意味なので抑える
+      if (thrDeadzoneU8 >= 255) thrDeadzoneU8 = 254;
       lcd.clear();
-    } else if (diff <= -PAGE_STEP_COUNTS) {
-      uiEncBase -= PAGE_STEP_COUNTS;
-      edit.sel = (edit.sel + 1) % 2;
-      uiLastMs = millis();
+    } else {
+      int v = (int)thrStartU8 + delta;
+      thrStartU8 = (uint8_t)clampi(v, 0, 255);
+      // startがdeadzone以下でも動くが、意味が薄いので最低でもdeadzone+1推奨
+      if (thrStartU8 < thrDeadzoneU8 + 1) thrStartU8 = (uint8_t)min(255, (int)thrDeadzoneU8 + 1);
       lcd.clear();
     }
-  } else {
-    // MIN/MAX はVRノブで決めるので回転は無視
-    if (diff >= PAGE_STEP_COUNTS) uiEncBase += PAGE_STEP_COUNTS;
-    else if (diff <= -PAGE_STEP_COUNTS) uiEncBase -= PAGE_STEP_COUNTS;
+    uiLastMs = millis();
+    return;
   }
+
+  // ここから下：数値編集ステップが来たら増減にする（後述）
+  if (diff >= stepCounts) uiEncBase += stepCounts;
+  else if (diff <= -stepCounts) uiEncBase -= stepCounts;
 }
 
 static inline CalibCfg& editCfgRef() {
@@ -273,19 +286,39 @@ static inline void editShortPressConfirm(int thr_raw, int str_raw) {
   int rawNow = editRawNow(thr_raw, str_raw);
   rawNow = clampi(rawNow, 0, 4095);
 
+  // =========================
+  // MENU (3 items)
+  // 0: Calibration
+  // 1: DeadZone+StartPoint (THR only)
+  // 2: Back
+  // =========================
   if (edit.step == EDIT_MENU) {
-    // sel=0: Setting / sel=1: Back
     if (edit.sel == 0) {
+      // -> Calibration flow
       edit.step = EDIT_DIR;
-      edit.sel = cfg.inv ? 1 : 0; // 0 normal / 1 invert
+      edit.sel = cfg.inv ? 1 : 0;  // 0 normal / 1 invert
       lcd.clear();
+    } else if (edit.sel == 1) {
+      // -> DeadZone+StartPoint (THR only)
+      if (edit.target == EDIT_THR) {
+        edit.step = EDIT_THR_DZ;
+        lcd.clear();
+      } else {
+        // STR: not implemented (fallback to menu)
+        edit.step = EDIT_MENU;
+        edit.sel = 0;
+        lcd.clear();
+      }
     } else {
-      // back
+      // -> Back (exit edit)
       editExitToScroll();
     }
     return;
   }
 
+  // =========================
+  // DIR (Normal / Invert)
+  // =========================
   if (edit.step == EDIT_DIR) {
     cfg.inv = (edit.sel == 1);
     edit.step = EDIT_MIN;
@@ -293,9 +326,31 @@ static inline void editShortPressConfirm(int thr_raw, int str_raw) {
     return;
   }
 
+  // =========================
+  // THR DeadZone / StartPoint
+  // =========================
+  if (edit.step == EDIT_THR_DZ) {
+    // next: StartPoint
+    edit.step = EDIT_THR_ST;
+    lcd.clear();
+    return;
+  }
+
+  if (edit.step == EDIT_THR_ST) {
+    // save curve params + calib (current cfg) then back to menu
+    saveCalibToNVS();
+    edit.step = EDIT_MENU;
+    edit.sel = 0;
+    lcd.clear();
+    return;
+  }
+
+  // =========================
+  // MIN (set using VR raw)
+  // =========================
   if (edit.step == EDIT_MIN) {
     cfg.minRaw = (uint16_t)rawNow;
-    // 最小が4095にならないように（操作不能回避）
+    // avoid min=4095 (would lock control)
     if (cfg.minRaw >= 4095) cfg.minRaw = 4094;
     sanitizeCalib(cfg);
     edit.step = EDIT_MAX;
@@ -303,23 +358,32 @@ static inline void editShortPressConfirm(int thr_raw, int str_raw) {
     return;
   }
 
-  // EDIT_MAX
-  cfg.maxRaw = (uint16_t)rawNow;
-  sanitizeCalib(cfg);
+  // =========================
+  // MAX (set using VR raw)
+  // =========================
+  if (edit.step == EDIT_MAX) {
+    cfg.maxRaw = (uint16_t)rawNow;
+    sanitizeCalib(cfg);
 
-  // max <= min の場合は最小限補正（1だけ広げる）
-  if (cfg.maxRaw <= cfg.minRaw) {
-    cfg.maxRaw = (uint16_t)min(4095, (int)cfg.minRaw + 1);
+    // if max <= min, ensure at least +1 span
+    if (cfg.maxRaw <= cfg.minRaw) {
+      cfg.maxRaw = (uint16_t)min(4095, (int)cfg.minRaw + 1);
+    }
+
+    saveCalibToNVS();
+
+    // back to menu
+    edit.step = EDIT_MENU;
+    edit.sel = 0;
+    lcd.clear();
+    return;
   }
 
-  saveCalibToNVS();
-
-  // メニューへ戻る
+  // fallback: back to menu
   edit.step = EDIT_MENU;
   edit.sel = 0;
   lcd.clear();
 }
-
 static inline void editLongPressAction() {
   // 長押し：メニューへ戻る（メニューなら編集終了）
   if (edit.step != EDIT_MENU) {
