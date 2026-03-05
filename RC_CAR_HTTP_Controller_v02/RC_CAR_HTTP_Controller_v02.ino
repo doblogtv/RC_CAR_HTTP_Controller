@@ -241,36 +241,75 @@ static inline void editHandleRotate(long encNow) {
   long diff = encNow - uiEncBase;
   if (millis() - uiLastMs < UI_DEBOUNCE_MS) return;
 
-  int stepCounts = PAGE_STEP_COUNTS;
+  // 1クリックの閾値
+  const int stepCounts = PAGE_STEP_COUNTS;
 
-  // DeadZone / StartPoint は回転で調整
-  if (edit.step == EDIT_THR_DZ || edit.step == EDIT_THR_ST) {
-    int delta = 0;
-    if (diff >= PAGE_STEP_COUNTS) { uiEncBase += PAGE_STEP_COUNTS; delta = +1; }
-    else if (diff <= -PAGE_STEP_COUNTS) { uiEncBase -= PAGE_STEP_COUNTS; delta = -1; }
-    else return;
-
-    if (edit.step == EDIT_THR_DZ) {
-      int v = (int)thrDeadzoneU8 + delta;
-      // 実用上0..200くらいが扱いやすい
-      thrDeadzoneU8 = (uint8_t)clampi(v, 0, 200);
-      // deadzone >=255は無意味なので抑える
-      if (thrDeadzoneU8 >= 255) thrDeadzoneU8 = 254;
-      lcd.clear();
-    } else {
-      int v = (int)thrStartU8 + delta;
-      thrStartU8 = (uint8_t)clampi(v, 0, 255);
-      // startがdeadzone以下でも動くが、意味が薄いので最低でもdeadzone+1推奨
-      if (thrStartU8 < thrDeadzoneU8 + 1) thrStartU8 = (uint8_t)min(255, (int)thrDeadzoneU8 + 1);
-      lcd.clear();
-    }
-    uiLastMs = millis();
+  // クリック確定（+1 / -1）
+  int delta = 0;
+  if (diff >= stepCounts) {
+    uiEncBase += stepCounts;
+    delta = +1;
+  } else if (diff <= -stepCounts) {
+    uiEncBase -= stepCounts;
+    delta = -1;
+  } else {
     return;
   }
 
-  // ここから下：数値編集ステップが来たら増減にする（後述）
-  if (diff >= stepCounts) uiEncBase += stepCounts;
-  else if (diff <= -stepCounts) uiEncBase -= stepCounts;
+  // ---- MENU: 3 items ----
+  if (edit.step == EDIT_MENU) {
+    edit.sel = (edit.sel + delta) % 3;
+    if (edit.sel < 0) edit.sel += 3;
+    uiLastMs = millis();
+    lcd.clear();
+    return;
+  }
+
+  // ---- DIR: 2 items ----
+  if (edit.step == EDIT_DIR) {
+    edit.sel = (edit.sel + delta) % 2;
+    if (edit.sel < 0) edit.sel += 2;
+    uiLastMs = millis();
+    lcd.clear();
+    return;
+  }
+
+  // ---- THR DeadZone / StartPoint: numeric ----
+  if (edit.step == EDIT_THR_DZ) {
+    int v = (int)thrDeadzoneU8 + delta;
+    // 実用レンジ（必要なら後で広げてOK）
+    v = clampi(v, 0, 200);
+    // deadzone >=255 は意味がないので抑える
+    if (v >= 255) v = 254;
+    thrDeadzoneU8 = (uint8_t)v;
+
+    // start が deadzone 以下にならないように（推奨）
+    if (thrStartU8 < (uint8_t)min(255, (int)thrDeadzoneU8 + 1)) {
+      thrStartU8 = (uint8_t)min(255, (int)thrDeadzoneU8 + 1);
+    }
+
+    uiLastMs = millis();
+    lcd.clear();
+    return;
+  }
+
+  if (edit.step == EDIT_THR_ST) {
+    int v = (int)thrStartU8 + delta;
+    v = clampi(v, 0, 255);
+
+    // start は deadzone+1 以上推奨
+    int minStart = min(255, (int)thrDeadzoneU8 + 1);
+    if (v < minStart) v = minStart;
+
+    thrStartU8 = (uint8_t)v;
+
+    uiLastMs = millis();
+    lcd.clear();
+    return;
+  }
+
+  // ---- MIN/MAX: ignore rotary (VRで決める) ----
+  uiLastMs = millis();
 }
 
 static inline CalibCfg& editCfgRef() {
