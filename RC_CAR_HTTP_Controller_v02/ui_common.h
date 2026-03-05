@@ -6,6 +6,10 @@
 
 extern LiquidCrystal_I2C lcd;
 
+// THR curve params are defined in .ino (globals)
+extern uint8_t thrDeadzoneU8;
+extern uint8_t thrStartU8;
+
 // clamp
 static inline int clampi(int v, int lo, int hi) {
   if (v < lo) return lo;
@@ -163,7 +167,7 @@ enum EditStep : uint8_t {
 struct EditCtx {
   EditTarget target;
   EditStep step;
-  int sel; // 0/1
+  int sel; // MENU=0..2, DIR=0..1
 };
 
 static inline void editReset(EditCtx& e, EditTarget t) {
@@ -183,11 +187,6 @@ static inline void lcdBox(bool on) {
 static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const EditCtx& e, int rawNow) {
   rawNow = clampi(rawNow, 0, 4095);
 
-  // header
-  char h[21];
-  snprintf(h, sizeof(h), "%s CALIB", label);
-  lcdPrintFixed(0, 0, String(h));
-
   // ---- MENU ----
   if (e.step == EDIT_MENU) {
     // 1行目：タイトル
@@ -206,7 +205,6 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
     // 4行目：Back
     lcd.setCursor(0, 3);
     lcdBox(e.sel == 2); lcd.print(" Back              ");
-
     return;
   }
 
@@ -220,7 +218,30 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
     lcdBox(e.sel == 1); lcd.print(" Invert            ");
     return;
   }
-  
+
+  // ---- THR DEADZONE ----
+  if (e.step == EDIT_THR_DZ) {
+    lcdPrintFixed(0, 0, "THR DEADZONE       ");
+    lcdPrintFixed(0, 1, "ROT:+/-  SW:Next   ");
+    char r2[21];
+    snprintf(r2, sizeof(r2), "dz:%3u            ", (unsigned)thrDeadzoneU8);
+    lcdPrintFixed(0, 2, String(r2));
+    drawCursor20_u8(3, thrDeadzoneU8);
+    return;
+  }
+
+  // ---- THR STARTPOINT ----
+  if (e.step == EDIT_THR_ST) {
+    lcdPrintFixed(0, 0, "THR STARTPOINT     ");
+    lcdPrintFixed(0, 1, "ROT:+/-  SW:Save   ");
+    char r2[21];
+    snprintf(r2, sizeof(r2), "st:%3u            ", (unsigned)thrStartU8);
+    lcdPrintFixed(0, 2, String(r2));
+    drawCursor20_u8(3, thrStartU8);
+    return;
+  }
+
+  // ---- MIN ----
   if (e.step == EDIT_MIN) {
     lcdPrintFixed(0, 1, "SET MIN (VR->raw)  ");
     char r2[21];
@@ -233,7 +254,7 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
     return;
   }
 
-  // EDIT_MAX
+  // ---- MAX ----
   lcdPrintFixed(0, 1, "SET MAX (min..4095)");
   char r2[21];
   snprintf(r2, sizeof(r2), "raw:%4d  max:%4u", rawNow, (unsigned)cfg.maxRaw);
