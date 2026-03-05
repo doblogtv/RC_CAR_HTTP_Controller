@@ -112,8 +112,15 @@ EditCtx edit; // 現在編集中（THR/STR共通）
 static inline bool isEditingThr() { return (uiMode == UI_EDIT && edit.target == EDIT_THR); }
 static inline bool isEditingStr() { return (uiMode == UI_EDIT && edit.target == EDIT_STR); }
 
+// THR curve (editable)
+uint8_t thrDeadzoneU8 = THR_DEADZONE_U8;
+uint8_t thrStartU8    = THR_START_U8;
+
 // ---------- Preferences ----------
 static inline void loadCalibFromNVS() {
+  thrDeadzoneU8 = (uint8_t)prefs.getUChar(KEY_THR_DZ, THR_DEADZONE_U8);
+  thrStartU8    = (uint8_t)prefs.getUChar(KEY_THR_ST, THR_START_U8);
+  
   prefs.begin(PREF_NS, true);
   cfgThr.inv    = prefs.getBool(KEY_THR_INV, false);
   cfgThr.minRaw = (uint16_t)prefs.getUShort(KEY_THR_MIN, 0);
@@ -129,6 +136,7 @@ static inline void loadCalibFromNVS() {
 }
 
 static inline void saveCalibToNVS() {
+  
   sanitizeCalib(cfgThr);
   sanitizeCalib(cfgStr);
 
@@ -140,6 +148,10 @@ static inline void saveCalibToNVS() {
   prefs.putBool(KEY_STR_INV, cfgStr.inv);
   prefs.putUShort(KEY_STR_MIN, cfgStr.minRaw);
   prefs.putUShort(KEY_STR_MAX, cfgStr.maxRaw);
+  
+  prefs.putUChar(KEY_THR_DZ, thrDeadzoneU8);
+  prefs.putUChar(KEY_THR_ST, thrStartU8);
+  
   prefs.end();
 }
 
