@@ -118,10 +118,12 @@ uint8_t thrStartU8    = THR_START_U8;
 
 // ---------- Preferences ----------
 static inline void loadCalibFromNVS() {
+  prefs.begin(PREF_NS, true);
+
+  
   thrDeadzoneU8 = (uint8_t)prefs.getUChar(KEY_THR_DZ, THR_DEADZONE_U8);
   thrStartU8    = (uint8_t)prefs.getUChar(KEY_THR_ST, THR_START_U8);
   
-  prefs.begin(PREF_NS, true);
   cfgThr.inv    = prefs.getBool(KEY_THR_INV, false);
   cfgThr.minRaw = (uint16_t)prefs.getUShort(KEY_THR_MIN, 0);
   cfgThr.maxRaw = (uint16_t)prefs.getUShort(KEY_THR_MAX, 4095);
@@ -509,7 +511,7 @@ void loop() {
   uint8_t str_u = mapRawToU8_Calib(str_raw, cfgStr);
 
   // thr: apply curve (deadzone + start offset)
-  uint8_t thr_curved = applyThrCurve(thr_u);
+  uint8_t thr_curved = applyThrCurve(thr_u, thrDeadzoneU8, thrStartU8);
 
   // ★送信値：編集中は thr=0（安全）
   uint8_t thr_send = (uiMode == UI_EDIT) ? 0 : thr_curved;
