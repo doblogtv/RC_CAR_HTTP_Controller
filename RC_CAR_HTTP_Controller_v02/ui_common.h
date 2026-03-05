@@ -213,23 +213,7 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
     return;
   }
 
-  if (edit.step == EDIT_MENU) {
-    if (edit.target == EDIT_THR) {
-      if (edit.sel == 0) {
-        // Calibrationへ（従来通り）
-        edit.step = EDIT_DIR;
-        edit.sel = cfg.inv ? 1 : 0;
-        lcd.clear();
-      } else {
-        // Deadzone編集へ
-        edit.step = EDIT_THR_DZ;
-        lcd.clear();
-      }
-    } else {
-      // STRは従来通り Setting/Back
-      if (edit.sel == 0) { ... } else { editExitToScroll(); }
-    }
-    return;
+ 
 }
 
   if (e.step == EDIT_MIN) {
