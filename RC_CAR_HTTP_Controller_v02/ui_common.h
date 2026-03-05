@@ -213,8 +213,6 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
     return;
   }
 
- 
-}
 
   if (e.step == EDIT_MIN) {
     lcdPrintFixed(0, 1, "SET MIN (VR->raw)  ");
