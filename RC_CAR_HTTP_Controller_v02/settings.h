@@ -59,6 +59,10 @@ enum DriveMode : uint8_t { DRV_RWD = 0, DRV_FWD = 1, DRV_4WD = 2 };
 enum Page : uint8_t { PAGE_WIFI=0, PAGE_THR=1, PAGE_STR=2, PAGE_ENC=3, PAGE_RESP=4 };
 constexpr uint8_t PAGE_COUNT = 5;
 
+// THR curve
+constexpr uint8_t THR_DEADZONE_U8 = 12;  // 0..255：この値以下は0送信（頭の無反応）
+constexpr uint8_t THR_START_U8    = 25;  // 0..255：動き出しの最小送信値（1じゃなくここから）
+
 // =========================
 // Preferences keys
 // =========================
