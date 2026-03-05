@@ -134,21 +134,16 @@ static inline uint8_t mapRawToU8_Calib(int raw, const CalibCfg& c0) {
   return (uint8_t)u;
 }
 
-static inline uint8_t applyThrCurve(uint8_t u) {
-  const int dz = (int)THR_DEADZONE_U8;
-  const int st = (int)THR_START_U8;
+static inline uint8_t applyThrCurve(uint8_t u, uint8_t dz, uint8_t st) {
+  const int idz = (int)dz;
+  const int ist = (int)st;
+  if (idz >= 255) return 0;
+  if (ist >= 255) return ((int)u <= idz) ? 0 : 255;
+  if ((int)u <= idz) return 0;
 
-  // safety
-  if (dz >= 255) return 0;
-  if (st >= 255) return (u <= dz) ? 0 : 255;
-
-  if ((int)u <= dz) return 0;
-
-  // remap: (dz..255) -> (st..255)
-  const int inSpan  = 255 - dz;
-  const int outSpan = 255 - st;
-
-  int v = st + (((int)u - dz) * outSpan + inSpan/2) / inSpan;
+  const int inSpan  = 255 - idz;
+  const int outSpan = 255 - ist;
+  int v = ist + (((int)u - idz) * outSpan + inSpan/2) / inSpan;
   return (uint8_t)clampi(v, 0, 255);
 }
 
