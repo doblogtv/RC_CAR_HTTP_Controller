@@ -188,32 +188,39 @@ static inline void renderCalibEdit(const char* label, const CalibCfg& cfg, const
   snprintf(h, sizeof(h), "%s CALIB", label);
   lcdPrintFixed(0, 0, String(h));
 
+  // ---- MENU ----
   if (e.step == EDIT_MENU) {
-    lcd.setCursor(0, 1);
-    lcdBox(e.sel == 0); lcd.print((String(label)=="THR") ? " Calibration" : " Setting");
-    lcdPrintFixed(13, 1, "");
+    // 1行目：タイトル
+    char h[21];
+    snprintf(h, sizeof(h), "%s EDIT MODE", label);
+    lcdPrintFixed(0, 0, String(h));
 
+    // 2行目：Calibration
+    lcd.setCursor(0, 1);
+    lcdBox(e.sel == 0); lcd.print(" Calibration       ");
+
+    // 3行目：DeadZone+StartPoint
     lcd.setCursor(0, 2);
-    lcdBox(e.sel == 1); lcd.print((String(label)=="THR") ? " Deadzone" : " Back");
-    lcdPrintFixed(13, 2, "");
-    
-    // THRなら curve値も表示、STRなら従来summary
-    if (String(label)=="THR") {
-      char s[21];
-      snprintf(s, sizeof(s), "dz:%3u st:%3u", (unsigned)thrDeadzoneU8, (unsigned)thrStartU8);
-      lcdPrintFixed(0, 3, String(s));
-    } else {
-      // row3 summary
-      char s[21];
-      snprintf(s, sizeof(s), "inv:%c mn:%4u mx:%4u",
-             cfg.inv ? 'Y' : 'N', (unsigned)cfg.minRaw, (unsigned)cfg.maxRaw);
-      lcdPrintFixed(0, 3, String(s));
-      
-    }
+    lcdBox(e.sel == 1); lcd.print(" DeadZone+Start    ");
+
+    // 4行目：Back
+    lcd.setCursor(0, 3);
+    lcdBox(e.sel == 2); lcd.print(" Back              ");
+
     return;
   }
 
-
+  // ---- DIR ----
+  if (e.step == EDIT_DIR) {
+    lcdPrintFixed(0, 0, String(label) + " CALIB");
+    lcdPrintFixed(0, 1, "DIR: Normal/Invert ");
+    lcd.setCursor(0, 2);
+    lcdBox(e.sel == 0); lcd.print(" Normal            ");
+    lcd.setCursor(0, 3);
+    lcdBox(e.sel == 1); lcd.print(" Invert            ");
+    return;
+  }
+  
   if (e.step == EDIT_MIN) {
     lcdPrintFixed(0, 1, "SET MIN (VR->raw)  ");
     char r2[21];
