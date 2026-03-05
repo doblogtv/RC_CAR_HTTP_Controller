@@ -73,3 +73,9 @@ static const char* KEY_THR_MAX = "thr_max";
 static const char* KEY_STR_INV = "str_inv";
 static const char* KEY_STR_MIN = "str_min";
 static const char* KEY_STR_MAX = "str_max";
+static const char* KEY_THR_DZ = "thr_dz";
+static const char* KEY_THR_ST = "thr_st";
+
+// runtime editable THR curve params (defined in .ino)
+extern uint8_t thrDeadzoneU8;
+extern uint8_t thrStartU8;
